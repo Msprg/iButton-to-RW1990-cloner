@@ -110,7 +110,8 @@ void printWelcome() {
   Serial.println(F("Enter 'S' to SHOW contents of the current memory slot."));
   Serial.println(F("Enter 'E' to EDIT the current memory slot."));
   Serial.println(F("Enter 'C' to CLEAR the current memory slot."));
-  Serial.println(F("Enter 'D' to DUMP all memory slots.\n"));
+  Serial.println(F("Enter 'D' to DUMP all memory slots."));
+  Serial.println(F("Enter '|' (pipe) to stop code execution, until iButton is detected.\n"));
 }
 
 bool slot_is_full() {
@@ -261,6 +262,8 @@ void bad_form() {
   resetFunc();
 }
 
+//todo: Implement CRC checking to make sure that iButton device is present (not just garbage). See ibutton.search() desc.
+
 bool read_iButton() { //Returns TRUE if the read was successful, FALSE if any error ocurred
   update_slot();
   if (!ibutton.search(addr)){           //read attached ibutton and assign value to buffer "addr"
@@ -290,6 +293,7 @@ bool detect_iButton() { //Returns TRUE if the iButton was detected, FALSE if any
     digitalWrite(RED, LOW);
     return false;                       //Returns FALSE if no iButton could be detected for any reason
   }
+  ibutton.reset_search();               //If we don't reset, the next ibutton.search will fail.
 
   Serial.print(F("An address / ID of the currently connected iButton is: "));
   for (byte x = 0; x < 8; x++) {        //Print current ID to the serial...
@@ -302,8 +306,8 @@ bool detect_iButton() { //Returns TRUE if the iButton was detected, FALSE if any
 
   blinkPin(GREEN, 5, 250);              //Signal operation success via green LED
   while(!digitalRead(READ)) delay(1);
-  
-  ibutton.reset_search();
+
+  Serial.println();
   return true;                          //Returns TRUE after successful execution
 }
 
@@ -332,7 +336,7 @@ bool write_iButton() { //Returns TRUE if the write was successful, FALSE if any 
       digitalWrite(RED, LOW);
       delay(15);
     }
-    
+                                  //todo: Implement readback to make sure everything was written correctly.
     ibutton.reset();
     blinkPin(GREEN, 5, 250);
     while(!digitalRead(WRITE)) delay(1);
@@ -347,7 +351,7 @@ bool write_iButton() { //Returns TRUE if the write was successful, FALSE if any 
 
 void setup(){
   Serial.begin(115200);
-  Serial.println("\n\n\n");
+  Serial.println("\n\n\n"); //Sometimes, serial manages to print grabage, before it resets on serial connect. So, we just skip a few lines.
   
   pinMode(RED, OUTPUT);
   pinMode(GREEN, OUTPUT);
@@ -393,6 +397,9 @@ void loop(){
         }
         else if(currChar == 'L') {    //LIST_IBUTTON command
           serial_choice = 6;
+        }
+        else if(currChar == '|') {    //WAIT command
+          serial_choice = 7;
         }
       }
     }                                 //END of reading from serial
@@ -555,11 +562,28 @@ void loop(){
 
     case 6:                           //list iBtn
       if (detect_iButton()) {
-        Serial.println(F("\n[SUCCESS]"));
+        Serial.println(F("[SUCCESS]"));
       } else {
         Serial.println(F("[ERROR] An error has occurred during an attemt to read the iButton!"));
         Serial.println(F("[INFO] Check your electrical connections!"));
       }
+
+      Serial.println();
+      serial_choice = -1;
+      break;
+
+    case 7:                           //wait iBtn
+      Serial.println(F("[WARNING] Code execution is being blocked until iButton device is detected"));
+      byte throwaway[8];
+      while(!ibutton.search(throwaway)) {
+        ibutton.reset_search();
+        yield();
+        delay(1);
+        Serial.available();     //todo: Allow this state to be breakable by some special command / character.
+      }
+                                //todo: Allow staging more than one command after resuming code execution.
+      ibutton.reset_search();
+      Serial.println(F("[SUCCESS] An iButton device has been successfully detected!"));
 
       Serial.println();
       serial_choice = -1;
