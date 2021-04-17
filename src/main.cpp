@@ -273,6 +273,7 @@ bool read_iButton() { //Returns TRUE if the read was successful, FALSE if any er
     digitalWrite(RED, LOW);
     return false;                       //Returns FALSE if no iButton could be detected for any reason
   }
+  ibutton.reset_search();               //If we don't reset, the next ibutton.search will fail.
 
   for(int i = 0; i < 8; i++) {
     EEPROM.write(i + (slot << 5), addr[i]);
@@ -338,6 +339,7 @@ bool write_iButton() { //Returns TRUE if the write was successful, FALSE if any 
     }
                                   //todo: Implement readback to make sure everything was written correctly.
     ibutton.reset();
+    ibutton.reset_search();       //If we don't reset, the next ibutton.search will fail.
     blinkPin(GREEN, 5, 250);
     while(!digitalRead(WRITE)) delay(1);
 
