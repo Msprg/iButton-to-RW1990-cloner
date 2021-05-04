@@ -49,6 +49,11 @@
  *   The serials are 8 bytes long, but the first is always 0C (the family code),
  *   and the last is always a CRC (calculated value). So, only 6 bytes are user-programmable.
  *   Therefore, the serial console only allows the user access to those 6 unique bytes.
+ * 
+ * When pasting batch command strings to the serial input, it's best to enable SW and HW flow control. (PlatformIO monitor, CTRL+T, CTRL+H)
+ * 
+ * You can use the following command string to wiping the data in EEPROM (All memory slots):
+ * am0cm1cm2cm3cm4cm5cm6cm7cm8cm9cmAcmBcmCcmDcmEcmFcd
  */
 
 #define PRINT_UID_to_serial Serial.print(F("<UID> AT ")); Serial.println(__LINE__);
@@ -61,13 +66,13 @@
 #define SDBGprintln if(PRINT_DEBUG_SERIAL)Serial.println
 
 
-#define IBUTTON 8 //iButton center, see above graphic
+#define IBUTTON 10 //iButton center, see above graphic
 
-#define RED 10 //Red LED annode
-#define GREEN 2 //Green LED annode
+#define RED 15 //Red LED annode
+#define GREEN 6 //Green LED annode
 
-#define READ 3 //Grounding button for reading
-#define WRITE 4 //Grounding button for writing
+#define READ 8 //Grounding button for reading
+#define WRITE 9 //Grounding button for writing
 
 #include <Arduino.h>
 #include <EEPROM.h>
@@ -78,7 +83,7 @@ const PROGMEM int SLOT[] = {9, 7, 6, 5}; //pins for activeMemSlot address, LSB f
 
 OneWire ibutton(IBUTTON);
 
-void(* resetFunc) (void) = 0; //declare reset function @ address 0
+void(* resetFunc) (void) = 0; //declare reset function @ memory address 0, essentially reseting the whole program, without rebooting the MCU itself...
 
 byte addr[8]; //Buffer for address for iButton.search();
 byte code[8]; //Buffer for manipulations with address;
@@ -769,6 +774,7 @@ void function_caller() { //todo: Merge this with the serial parser function?
           delay(1);
           if (Serial.available() > 0) {
             //todo: Allow this state to be breakable by some special command / character.
+            //todo: Or maybe even better - timeout!
           }
         }
         ibutton.reset_search();
@@ -809,6 +815,7 @@ void function_caller() { //todo: Merge this with the serial parser function?
         
         S.println(F("===Change active memory slot==="));
         S.print(F("[INFO] Currently active memory slot is: ")); S.println(activeMemSlot, HEX);
+        S.println(F("[INFO] You can press 'W' to wipe all memory slots at once." ));
         S.println(F("[INFO] Write 0-to-F to select active memory slot!"));
         S.println(F("[INFO] You can enter 'L' to show list of the memory slots, \n[INFO] or enter 'X' to cancel!"));
         S.println();
@@ -823,6 +830,41 @@ void function_caller() { //todo: Merge this with the serial parser function?
             dump_all_mem_slots_to_serial();
             S.println();
             continue;
+          }
+          if (ch == 'W') {                   //If it's 'W', prepare to WIPE ALL MEMORY SLOTS! "(W)IPE"
+            S.println(F("[WARNING] YOU ARE ATTEMTING TO WIPE ALL MEMORY SLOTS IN THE DEVICE'S MEMORY!"));
+            S.println(F("[WARNING] TO CONFIRM THIS OPERATION FINISH THE WORD \"(W)IPE\" (you've already wrote the \"W\")."));
+            S.println(F("[INFO] YOU MUST WRITE THE \"IPE\" IN CAPITAL LETTERS."));
+            S.println(F("[INFO] To skip this confirmation, you can just write \"WIPE\" the next time after selecting menu option 'm'."));
+            S.println();
+
+            PROGMEM const byte KEY[3] = {'I', 'P', 'E'};  //KEY CHARACTERS for confirming wipe.
+            byte serialBuffer[3];
+            for(int x = 0; x < 3; x++) {
+              wait_for_serial_input();
+              serialBuffer[x] = Serial.read();
+              if (serialBuffer[x] != KEY[x]) {            //IF the letters - as they're coming in - doesn't match with the KEY, abort!
+                S.println(F("[ERROR] Invalid input! Wipe cancelled!"));
+                clear_serial();
+                /* Okay, so the break won't work here, as it breaks the FOR loop, not the WHILE loop.
+                * We might get away, with return, which might complicate something in the future though...
+                * And then, there is is this... https://en.cppreference.com/w/cpp/language/break#Explanation
+                * AKA "use goto". But I'd be crucified for this, not that much people will read this :D
+                */
+                return;
+              }
+            }                                             //IF we got through the FOR cycle, means the serial input matches the KEY!
+            
+            for(byte memSlot = 0x00; memSlot < 0x10; memSlot++) { //FOR every slot, one at a time...
+              for(int x = 0; x < 16; x++) {
+                EEPROM.write(x + (memSlot << 5), 0x00);     //CLEAR one.
+              }
+            }
+
+            S.println(F("[SUCCESS] All memory slots in EEPROM has been cleared!"));
+            dump_all_mem_slots_to_serial();
+            S.println();
+            break;
           }
           if (set_active_mem_slot(ch)) {    //If the active memory slot change was successfull...
             S.print(F("[SUCCESS] The currently active memory slot was changed to: "));
