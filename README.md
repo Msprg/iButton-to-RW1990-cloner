@@ -18,7 +18,8 @@ Some of the added "features of this code" include:
 * Advanced mode which exposes a bit more control.
 * Changing **currently active** memory slot manually. Also ignoring GPIO memory slot selecting in advanced mode.
 * Editing memory slots - contents (7 or all 8 bytes in advanced mode) & name.
-* Ability to edit name of the memory slot withoout modifying contents.
+* Ability to edit name of the memory slot without modifying contents.
+* Ability to clear / wipe all memory slots at once.
 
 Hopefully, more to come!
 
