@@ -54,6 +54,12 @@
  * 
  * You can use the following command string to wiping the data in EEPROM (All memory slots):
  * am0cm1cm2cm3cm4cm5cm6cm7cm8cm9cmAcmBcmCcmDcmEcmFcd
+ * 
+ * Filling memory slots with reads:
+ * a|m0rm1rm2rm3rm4rm5rm6rm7rm8rm9rmArmBrmCrmDrmErmFrd
+ * 
+ * Wiping all memory slots in EEPROM:
+ * AMWIPE
  */
 
 #define PRINT_UID_to_serial Serial.print(F("<UID> AT ")); Serial.println(__LINE__);
@@ -80,6 +86,7 @@
 
 
 const PROGMEM int SLOT[] = {9, 7, 6, 5}; //pins for activeMemSlot address, LSB first, grounding switches
+PROGMEM const byte WIPE_CONFIRMATION[] = {'I', 'P', 'E'};  //WIPE_CONFIRMATION CHARACTERS for confirming wipe.
 
 OneWire ibutton(IBUTTON);
 
@@ -838,12 +845,12 @@ void function_caller() { //todo: Merge this with the serial parser function?
             S.println(F("[INFO] To skip this confirmation, you can just write \"WIPE\" the next time after selecting menu option 'm'."));
             S.println();
 
-            PROGMEM const byte KEY[3] = {'I', 'P', 'E'};  //KEY CHARACTERS for confirming wipe.
-            byte serialBuffer[3];
-            for(int x = 0; x < 3; x++) {
+            uint8_t arraySize = sizeof(WIPE_CONFIRMATION) / sizeof(WIPE_CONFIRMATION[0]); //It's 3 for 'I', 'P', 'E'.
+            byte serialBuffer[arraySize];
+            for(int x = 0; x < arraySize; x++) {
               wait_for_serial_input();
               serialBuffer[x] = Serial.read();
-              if (serialBuffer[x] != KEY[x]) {            //IF the letters - as they're coming in - doesn't match with the KEY, abort!
+              if (serialBuffer[x] != WIPE_CONFIRMATION[x]) {            //IF the letters - as they're coming in - doesn't match with the WIPE_CONFIRMATION, abort!
                 S.println(F("[ERROR] Invalid input! Wipe cancelled!"));
                 clear_serial();
                 /* Okay, so the break won't work here, as it breaks the FOR loop, not the WHILE loop.
@@ -853,7 +860,7 @@ void function_caller() { //todo: Merge this with the serial parser function?
                 */
                 return;
               }
-            }                                             //IF we got through the FOR cycle, means the serial input matches the KEY!
+            }                                             //IF we got through the FOR cycle, means the serial input matches the WIPE_CONFIRMATION!
             
             for(byte memSlot = 0x00; memSlot < 0x10; memSlot++) { //FOR every slot, one at a time...
               for(int x = 0; x < 16; x++) {
