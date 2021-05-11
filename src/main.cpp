@@ -75,7 +75,7 @@
 #define IBUTTON 10 //iButton center, see above graphic
 
 #define RED 15 //Red LED annode
-#define GREEN 6 //Green LED annode
+#define GREEN 3 //Green LED annode
 
 #define READ 8 //Grounding button for reading
 #define WRITE 9 //Grounding button for writing
@@ -99,6 +99,8 @@ int8_t serial_choice = -1; //0=show, 1=edit, 2=clear, 3=dump, 4=read iBtn, 5=wri
 byte activeMemSlot = 0; //only lower nibble (first 4 bits of the byte) is used
 bool advancedMode = false;
 
+//TODO: Besides editing, allow copying memory slots...
+//TODO: Consolidate all memory operations, under some memory management submenu
 
 void printMenu() { //Serial menu...
   S.println(F("===Welcome to iButton Cloner Serial Console==="));
@@ -119,8 +121,8 @@ void printMenu() { //Serial menu...
   S.println();
 }
 
-//todo: Make serial_parser return serial_choice & feed it into other function supposed to run correct menu function...
-//todo: Maybe make it output the character, or an int, and we can get rid of global serial_choice completely!
+//TODO: Make serial_parser return serial_choice & feed it into other function supposed to run correct menu function...
+//TODO: Maybe make it output the character, or an int, and we can get rid of global serial_choice completely!
 void serial_parser() { 
   delay(30);                          //wait for serial to catch up
   byte currChar;
@@ -209,7 +211,7 @@ void clear_serial() {
 #endif
 }
 
-void wait_for_serial_input() {  //While there is NO serial input... Wait... //todo: should we add "timeout" parameter here?
+void wait_for_serial_input() {  //While there is NO serial input... Wait... //TODO: should we add "timeout" parameter here?
 #if USE_SERIAL == true
   while (Serial.available() < 1) {  //While there is NO serial input...
     delay(1);                       //Wait...
@@ -477,9 +479,9 @@ void edit_slot(byte memSlot, byte numberOfBytes) {  //Submenu for editing curren
   int arraySize = 7;
   if (advancedMode) arraySize = numberOfBytes;
   
-  SDBGprint(F("<DEBUG> advanced mode? ")); SDBGprintln(advancedMode);   //todo: press "return / enter" to just rename the slot.
+  SDBGprint(F("<DEBUG> advanced mode? ")); SDBGprintln(advancedMode);   //TODO: press "return / enter" to just rename the slot.
   SDBGprint(F("<DEBUG> arraySize: ")); SDBGprintln(arraySize);
-  if (advancedMode && arraySize == 8) {                                 //todo: modify this, so it's possible to edit range from just 1 (first) to all 8 (all of them)
+  if (advancedMode && arraySize == 8) {                                 //TODO: modify this, so it's possible to edit range from just 1 (first) to all 8 (all of them)
     S.println(F("0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 (ALL 8 Bytes)"));
   } else if (arraySize == 7) {
     S.println(F("0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 (7 Bytes - last one is autofilled checksum)"));
@@ -489,7 +491,7 @@ void edit_slot(byte memSlot, byte numberOfBytes) {  //Submenu for editing curren
 
   S.println(F("Or just press <return> to keep the code in the memory slot unchanged. (Any invalid input will cause this also)"));
 
-  while(Serial.available() <= 0);               //todo: can we use wait_for_serial_input() function here? Should we add "timeout" parameter to it?
+  while(Serial.available() <= 0);               //TODO: can we use wait_for_serial_input() function here? Should we add "timeout" parameter to it?
   delay(50);
   
   while(Serial.available() > 0) {               //We start reading input from the serial here...
@@ -547,7 +549,7 @@ void print_mem(int lower, int upper, byte memSlot) {
   }
 }
 
-void print_mem_name(byte memSlot) { //todo: Check if a memSlot is valid (0-F / 0-15) (time to make a is_slot_valid function?)
+void print_mem_name(byte memSlot) { //TODO: Check if a memSlot is valid (0-F / 0-15) (time to make a is_slot_valid function?)
   if(EEPROM.read(0 + 8 + (memSlot << 5)) == 0x00) {
     S.print("<NONAME>");                          //Changed from "<UNNAMED>" to "<NONAME>" for exactly 8 characters
   }
@@ -579,7 +581,7 @@ void dump_all_mem_slots_to_serial() { //Writes all the slots to the serial, mark
     }
 }
 
-//todo: Implement CRC checking to make sure that iButton device is present (not just garbage). See ibutton.search() desc.
+//TODO: Implement CRC checking to make sure that iButton device is present (not just garbage). See ibutton.search() desc.
 
 bool detect_iButton() { //Returns TRUE if the iButton was detected, FALSE if any error ocurred
 
@@ -601,7 +603,7 @@ bool detect_iButton() { //Returns TRUE if the iButton was detected, FALSE if any
     if (x < 8 - 1) S.print(", ");
   }
 
-  blinkPin(GREEN, 5,750);              //Signal operation success via green LED
+  blinkPin(GREEN, 5,150);              //Signal operation success via green LED
   while(!digitalRead(READ)) delay(1);
 
   S.println();
@@ -654,7 +656,7 @@ bool write_iButton() { //Returns TRUE if the write was successful, FALSE if any 
       digitalWrite(RED, LOW);
       delay(15);
     }
-                                  //todo: Implement readback to make sure everything was written correctly...?
+                                  //TODO: Implement readback to make sure everything was written correctly...?
     ibutton.reset();
     ibutton.reset_search();       //If we don't reset, the next ibutton.search will fail.
     blinkPin(GREEN, 5, 150);
@@ -668,7 +670,7 @@ bool write_iButton() { //Returns TRUE if the write was successful, FALSE if any 
   }
 }
 
-void function_caller() { //todo: Merge this with the serial parser function?
+void function_caller() { //TODO: Merge this with the serial parser function?
   switch (serial_choice) {          //Execute apropiate command 
       case 0:                         //Show
         S.println(F("===SHOW contents of the currently active memory slot==="));
@@ -780,8 +782,8 @@ void function_caller() { //todo: Merge this with the serial parser function?
           yield();
           delay(1);
           if (Serial.available() > 0) {
-            //todo: Allow this state to be breakable by some special command / character.
-            //todo: Or maybe even better - timeout!
+            //TODO: Allow this state to be breakable by some special command / character.
+            //TODO: Or maybe even better - timeout!
           }
         }
         ibutton.reset_search();
@@ -816,7 +818,7 @@ void function_caller() { //todo: Merge this with the serial parser function?
         break;
 
       case 9:                         //Manual memory (activeMemSlot) change
-        if (!advancedMode) break; //todo
+        if (!advancedMode) break; //TODO
 
         //display all the slots?
         
@@ -900,6 +902,7 @@ void function_caller() { //todo: Merge this with the serial parser function?
 void setup() {
   #if USE_SERIAL == true
   Serial.begin(115200);
+  delay(500);
   #endif
 
   pinMode(RED, OUTPUT);
