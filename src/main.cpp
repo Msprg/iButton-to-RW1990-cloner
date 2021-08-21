@@ -90,7 +90,8 @@ PROGMEM const byte WIPE_CONFIRMATION[] = {'I', 'P', 'E'};  //WIPE_CONFIRMATION C
 
 OneWire ibutton(IBUTTON);
 
-void(* resetFunc) (void) = 0; //declare reset function @ memory address 0, essentially reseting the whole program, without rebooting the MCU itself...
+// void(* resetFunc) (void) = 0; //declare reset function @ memory address 0, essentially reseting the whole program, without rebooting the MCU itself. SEE: https://forum.arduino.cc/t/reset-command/12939/14
+void(* resetFunc) (void) = &setup; //declare reset function @ memory address 0, essentially reseting the whole program, without rebooting the MCU itself. SEE: https://forum.arduino.cc/t/reset-command/12939/14
 
 byte addr[8]; //Buffer for address for iButton.search();
 byte code[8]; //Buffer for manipulations with address;
@@ -226,9 +227,10 @@ void bad_form() { //Called on some invalid serial input, not always though. Main
 #endif
   clear_serial();
   S.println(F("[WARNING] Exiting from any functions to the main menu!"));
-  delay(50);    //If there won't be this delay, the serial won't finisht printing & glitches out.
-  resetFunc();  //When this runs, it appears, that it'll reset loop / end all functions. I'm not actually sure what's the purpose of this though...
-}
+  // delay(50);    //If there won't be this delay, the serial won't finisht printing & glitches out.
+  //TODO: The resetFunc() seems currently broken. I haven't found the reason yet, but it's unsupported way reset.
+  // resetFunc();  //When this runs, it appears, that it'll reset loop / end all functions. I'm not actually sure what's the purpose of this though...
+  }
 
 int hex_digit_val_dec(char ch) {
   int returnType;
@@ -515,7 +517,10 @@ void edit_slot(byte memSlot, byte numberOfBytes) {  //Submenu for editing curren
     S.print(F("[SUCCESS] Code saved to slot "));
     S.print(memSlot, HEX);
     S.print("!\n");
+    } else {    //if the serial_parse_hex returned false (something has gone wrong)
+      return;   //exit this function immediately.
     }
+    
 
     S.println(F("[INPUT] Waiting for name (up to 8 characters)..."));
     while(Serial.available() < 1) delay(1);
@@ -921,7 +926,7 @@ void setup() {
   printMenu();  //print serial console welcome message
 }
 
-void loop(){
+void loop() {
   if (Serial.available() > 0) {       //if there are data in the serial buffer...
     serial_parser();                  //Looks up, per 1 character, if the serial input is a command, otherwise prints input back
 
