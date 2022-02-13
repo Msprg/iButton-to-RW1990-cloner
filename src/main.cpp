@@ -50,7 +50,8 @@
  *   and the last is always a CRC (calculated value). So, only 6 bytes are user-programmable.
  *   Therefore, the serial console only allows the user access to those 6 unique bytes.
  * 
- * When pasting batch command strings to the serial input, it's best to enable SW and HW flow control. (PlatformIO monitor, CTRL+T, CTRL+H)
+ * When pasting batch command strings to the serial input, 
+ * it's best to enable SW and HW flow control. (PlatformIO monitor: CTRL+T, CTRL+H)
  * 
  * You can use the following command string to wiping the data in EEPROM (All memory slots):
  * am0cm1cm2cm3cm4cm5cm6cm7cm8cm9cmAcmBcmCcmDcmEcmFcd
@@ -67,12 +68,12 @@
 #define USE_SERIAL true  //set to true for Serial output, false for no Serial at all.
 #define S if(USE_SERIAL)Serial
 
-#define PRINT_DEBUG_SERIAL false  //set to true for Serial output, false for no Serial at all.
+#define PRINT_DEBUG_SERIAL true  //set to true for Serial output, false for no Serial at all.
 #define SDBGprint if(PRINT_DEBUG_SERIAL)Serial.print
 #define SDBGprintln if(PRINT_DEBUG_SERIAL)Serial.println
 
 
-#define IBUTTON 10 //iButton center, see above graphic
+#define IBUTTON 8 //iButton center, see above graphic
 
 #define RED 15 //Red LED annode
 #define GREEN 3 //Green LED annode
@@ -165,10 +166,10 @@ void serial_parser() {
         serial_choice = 9;
         break;
       default:            //For easier adding of new characters.
-        S.print("You have written: ");
-        S.println((char)currChar);
-        S.println(currChar, HEX);
-        S.println(currChar);
+        SDBGprint("You have written: ");
+        SDBGprintln((char)currChar);
+        SDBGprintln(currChar, HEX);
+        SDBGprintln(currChar);
         break;
       }
     }
@@ -314,15 +315,20 @@ int hexstr_to_int(String hex) {
 }
 
 void update_slot() {  //Make a memory slot active according to GPIO pins
-  if (advancedMode) return; //IF is in advanced mode, do not change activeMemSlot.
+    if (!advancedMode) { //IF is in advanced mode, do not change activeMemSlot correspond to the GPIO pins state.
 
-  activeMemSlot = 0x00;
-  for(int x = 0; x < 4; x++) {
-    activeMemSlot = activeMemSlot | (digitalRead(SLOT[x]) << x);
+    activeMemSlot = 0x00;
+    for(int x = 0; x < 4; x++) {
+      activeMemSlot = activeMemSlot | (digitalRead(SLOT[x]) << x);
+    }
   }
-  for(int x = 0; x < 8; x++) {
+
+  for(int x = 0; x < 8; x++) {  //Update the global variable code to contain aporopriate data from the currently active memory slot.
     code[x] = EEPROM.read(x + (activeMemSlot << 5));
-  }
+  } //CRITICAL FIXME THIS MUST BE RUN BEFORE WRITING AS THE WRITE FUNCTION DEPENDS ON IT ENTIRELY!!!
+    //MAKE IT SO THE WRITE ENSURES THE SLOT ISN'T EMPTY, AND SYNCES THIS GLOBAL VARIABLE JUST BEFORE WRITING!
+    //IDEALLY, THE WRITE FUNCTION WOULD GET THE DATA FROM THE CURRENTLY ACTIVE EEPROM SLOT COMPLETELY INDEPENDENTLY!!!
+    //MAKE SURE THE CODE ABOUT TO BE WRITTEN DOES MAKE SENSE AND DOESN'T START WITH ZERO BYTE!!!
 }
 
 bool set_active_mem_slot(char c) {  //If it's one of the valid numbers, change activeMemSlot
@@ -370,6 +376,7 @@ bool serial_parse_hex(int result[], uint8_t arraySize) {  //Reads hex values fro
         return false;                                       //and return false.
       }
       S.println(F("[ERROR] No leading 0 found (before leading x).\n"));
+      SDBGprint(F("<DEBUG> You have written ")); SDBGprint(justTheFirstOne); SDBGprintln(F(" instead!"));
       bad_form();
       return false;
     }
@@ -486,7 +493,7 @@ void edit_slot(byte memSlot, byte numberOfBytes) {  //Submenu for editing curren
   if (advancedMode && arraySize == 8) {                                 //TODO: modify this, so it's possible to edit range from just 1 (first) to all 8 (all of them)
     S.println(F("0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 (ALL 8 Bytes)"));
   } else if (arraySize == 7) {
-    S.println(F("0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 (7 Bytes - last one is autofilled checksum)"));
+    S.println(F("0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07 (7 Bytes - 8-th one is an autofilled checksum)"));
   } else {
     S.println(F("0x01, 0x02, 0x03, 0x04, 0x05, 0x06 (6 Bytes)"));
   }
@@ -502,10 +509,8 @@ void edit_slot(byte memSlot, byte numberOfBytes) {  //Submenu for editing curren
 
     if (serial_parse_hex(result, arraySize)) {  //returns true if all of the serial input was successfully parsed, otherwise returns false.
 
-    #if PINT_DEBUG_SERIAL == true
     SDBGprint(F("<DEBUG> size of the array \"result\" is: "));
     byte serialtmp = sizeof(result) / sizeof(result[0]); SDBGprintln(serialtmp);
-    #endif
 
     SDBGprint(F("<DEBUG> Contents of the array \"result\" are as follows: "));
     for (size_t i = 0; i < sizeof(result) / sizeof(result[0]); i++)
@@ -518,9 +523,9 @@ void edit_slot(byte memSlot, byte numberOfBytes) {  //Submenu for editing curren
     S.print(memSlot, HEX);
     S.print("!\n");
     } else {    //if the serial_parse_hex returned false (something has gone wrong)
-      return;   //exit this function immediately.
-    }
-    
+      //return;   //exit this function immediately.
+    } //FIXME due to change/deprecation of the reset func, this no longer leads to renaming slot without editing the contents of it. See the commit desc.
+      //FIXME seems it's... working correctly as of 13.02.2022... the name change doesn't mess with the memory slot content...
 
     S.println(F("[INPUT] Waiting for name (up to 8 characters)..."));
     while(Serial.available() < 1) delay(1);
@@ -646,7 +651,34 @@ bool write_iButton() { //Returns TRUE if the write was successful, FALSE if any 
       digitalWrite(RED, LOW);
       return false;               //Returns FALSE if no iButton could be detected for any reason
     }
-                                   
+    
+    S.print(F("Writing to iButton at address: "));
+    for (byte x = 0; x < 8; x++) {  
+      byte curr_val = addr[x];
+      S.print("0x");
+      if (curr_val<0x10) {S.print("0");}
+      S.print(curr_val,HEX);
+      if (x < 8 - 1) S.print(", ");
+    }
+    S.println();
+    S.print(F("Writing data: "));
+    
+    for (byte x = 0; x<8; x++){
+      byte curr_val = code[x];
+      S.print("0x");
+      if (curr_val<0x10) {S.print("0");}
+      S.print(curr_val,HEX);
+      if (x < 8 - 1) S.print(", ");
+      }
+      S.println();
+                    S.println(F("<DEBUG> NOT PROCEEDING - RETURNING FROM FUNCTION IMMEDIATELY!"));
+                    return;
+
+    //CRITICAL FIXME THIS MUST BE RUN BEFORE WRITING AS THE WRITE FUNCTION DEPENDS ON IT ENTIRELY!!!
+    //MAKE IT SO THE WRITE ENSURES THE SLOT ISN'T EMPTY, AND SYNCES THIS GLOBAL VARIABLE JUST BEFORE WRITING!
+    //IDEALLY, THE WRITE FUNCTION WOULD GET THE DATA FROM THE CURRENTLY ACTIVE EEPROM SLOT COMPLETELY INDEPENDENTLY!!!
+    //MAKE SURE THE CODE ABOUT TO BE WRITTEN DOES MAKE SENSE AND DOESN'T START WITH ZERO BYTE!!!
+
     ibutton.skip();               // This is code preparing RW1990 to be written to...
     ibutton.reset();              // THESE LINES ARE VITAL
     ibutton.write(0x33);          // I thought they were just for reading, but without these lines,
@@ -663,6 +695,7 @@ bool write_iButton() { //Returns TRUE if the write was successful, FALSE if any 
     }
                                   //TODO: Implement readback to make sure everything was written correctly...?
     ibutton.reset();
+    delay(5);
     ibutton.reset_search();       //If we don't reset, the next ibutton.search will fail.
     blinkPin(GREEN, 5, 150);
     while(!digitalRead(WRITE)) delay(1);
@@ -753,7 +786,7 @@ void function_caller() { //TODO: Merge this with the serial parser function?
         S.println(F("[INFO] Reading from the currently selected slot & writing to the iButton!"));
 
         if (write_iButton()) {
-          S.println(F("[SUCCESS] Data from the current memory slot should be successfully written to the iButton."));
+          S.print(F("[SUCCESS] Data from the current memory slot ")); S.print(activeMemSlot); S.println(F(" should be successfully written to the iButton."));
           S.println(F("[INFO] You can check by reading the iButton now!"));
         } else {
           S.println(F("[ERROR] An error has occurred during an attemt to write to the iButton!"));
@@ -869,6 +902,7 @@ void function_caller() { //TODO: Merge this with the serial parser function?
               }
             }                                             //IF we got through the FOR cycle, means the serial input matches the WIPE_CONFIRMATION!
             
+            S.println(F("[INFO]======WIPING=NOW!======"));
             for(byte memSlot = 0x00; memSlot < 0x10; memSlot++) { //FOR every slot, one at a time...
               for(int x = 0; x < 16; x++) {
                 EEPROM.write(x + (memSlot << 5), 0x00);     //CLEAR one.
