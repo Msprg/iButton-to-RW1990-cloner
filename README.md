@@ -5,7 +5,7 @@ This is the version of sketch by [**Ella Jameson,**](https://www.youtube.com/wat
 Most of the added funcionallity is ability to control the program through serial console.
 
 Recomended enviroment for building this project is using PlatformIO & IDE of your choice - ideally one that supports PlatformIO integration. I'm using VS Code.
-This project should be generic enough to allow proting to other microcontrollers, with little to no changes in code.
+This project should be generic enough to allow porting to other microcontrollers, with little to no changes in code.
 
 
 Some of the added "features of this code" include:
