@@ -53,7 +53,7 @@
  * When pasting batch command strings to the serial input, 
  * it's best to enable SW and HW flow control. (PlatformIO monitor: CTRL+T, CTRL+H)
  * 
- * You can use the following command string to wiping the data in EEPROM (All memory slots):
+ * You can use the following command string to wipe the data in EEPROM (All memory slots):
  * am0cm1cm2cm3cm4cm5cm6cm7cm8cm9cmAcmBcmCcmDcmEcmFcd
  * 
  * Filling memory slots with reads:
@@ -73,7 +73,7 @@
 #define SDBGprintln if(PRINT_DEBUG_SERIAL)Serial.println
 
 
-#define IBUTTON 8 //iButton center, see above graphic
+#define IBUTTON 10 //iButton center, see above graphic
 
 #define RED 15 //Red LED annode
 #define GREEN 3 //Green LED annode
@@ -671,8 +671,8 @@ bool write_iButton() { //Returns TRUE if the write was successful, FALSE if any 
       if (x < 8 - 1) S.print(", ");
       }
       S.println();
-                    S.println(F("<DEBUG> NOT PROCEEDING - RETURNING FROM FUNCTION IMMEDIATELY!"));
-                    return;
+                    // S.println(F("<DEBUG> NOT PROCEEDING - RETURNING FROM FUNCTION IMMEDIATELY!"));
+                    // return;
 
     //CRITICAL FIXME THIS MUST BE RUN BEFORE WRITING AS THE WRITE FUNCTION DEPENDS ON IT ENTIRELY!!!
     //MAKE IT SO THE WRITE ENSURES THE SLOT ISN'T EMPTY, AND SYNCES THIS GLOBAL VARIABLE JUST BEFORE WRITING!
