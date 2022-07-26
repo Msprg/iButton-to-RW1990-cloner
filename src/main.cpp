@@ -110,6 +110,7 @@ void printMenu() { //Serial menu...
   S.println(F("Enter 'S' to SHOW contents of the currently active memory slot."));
   S.println(F("Enter 'R' to READ FROM iButton to currently active memory slot."));
   S.println(F("Enter 'W' to WRITE TO iButton from currently active memory slot."));
+  S.println(F("Enter 'V' to VERIFY iButton address against currently active memory slot."));
   S.println(F("Enter 'E' to EDIT the currently active memory slot."));
   S.println(F("Enter 'C' to CLEAR the currently active memory slot."));
   S.println(F("Enter 'D' to DUMP all memory slots."));
@@ -165,6 +166,9 @@ void serial_parser() {
       case 'M':           //MEMORY_SELECT menu
         serial_choice = 9;
         break;
+      case 'V':           //VERIFY command
+        serial_choice = 10;
+        break;
       default:            //For easier adding of new characters.
         SDBGprint("You have written: ");
         SDBGprintln((char)currChar);
@@ -176,7 +180,7 @@ void serial_parser() {
   }                                   //END of reading from serial
 }
 
-int writeByte(byte data){
+int writeByte(byte data) {
   int data_bit;
   for(data_bit=0; data_bit<8; data_bit++){
     if (data & 1){
@@ -595,7 +599,7 @@ void dump_all_mem_slots_to_serial() { //Writes all the slots to the serial, mark
 
 bool detect_iButton() { //Returns TRUE if the iButton was detected, FALSE if any error ocurred
 
-  if (!ibutton.search(addr)){           //read attached ibutton and assign value to buffer "addr"
+  if (!ibutton.search(addr)) {           //read attached ibutton and assign value to buffer "addr"
     digitalWrite(RED, HIGH);
     ibutton.reset_search();
     delay(1);
@@ -643,69 +647,125 @@ bool read_iButton() { //Returns TRUE if the read was successful, FALSE if any er
 
 bool write_iButton() { //Returns TRUE if the write was successful, FALSE if any error ocurred
   update_slot();
-  if(slot_is_full(activeMemSlot)) {
-    if (!ibutton.search(addr)) {  //read attached ibutton and assign value to buffer "addr"
-      digitalWrite(RED, HIGH);
-      ibutton.reset_search();
-      delay(1);
-      digitalWrite(RED, LOW);
-      return false;               //Returns FALSE if no iButton could be detected for any reason
-    }
-    
-    S.print(F("Writing to iButton at address: "));
-    for (byte x = 0; x < 8; x++) {  
-      byte curr_val = addr[x];
-      S.print("0x");
-      if (curr_val<0x10) {S.print("0");}
-      S.print(curr_val,HEX);
-      if (x < 8 - 1) S.print(", ");
-    }
-    S.println();
-    S.print(F("Writing data: "));
-    
-    for (byte x = 0; x<8; x++){
-      byte curr_val = code[x];
-      S.print("0x");
-      if (curr_val<0x10) {S.print("0");}
-      S.print(curr_val,HEX);
-      if (x < 8 - 1) S.print(", ");
-      }
-      S.println();
-                    // S.println(F("<DEBUG> NOT PROCEEDING - RETURNING FROM FUNCTION IMMEDIATELY!"));
-                    // return;
-
-    //CRITICAL FIXME THIS MUST BE RUN BEFORE WRITING AS THE WRITE FUNCTION DEPENDS ON IT ENTIRELY!!!
-    //MAKE IT SO THE WRITE ENSURES THE SLOT ISN'T EMPTY, AND SYNCES THIS GLOBAL VARIABLE JUST BEFORE WRITING!
-    //IDEALLY, THE WRITE FUNCTION WOULD GET THE DATA FROM THE CURRENTLY ACTIVE EEPROM SLOT COMPLETELY INDEPENDENTLY!!!
-    //MAKE SURE THE CODE ABOUT TO BE WRITTEN DOES MAKE SENSE AND DOESN'T START WITH ZERO BYTE!!!
-
-    ibutton.skip();               // This is code preparing RW1990 to be written to...
-    ibutton.reset();              // THESE LINES ARE VITAL
-    ibutton.write(0x33);          // I thought they were just for reading, but without these lines,
-    ibutton.skip();               // writing will brick the fob forever! I broke 6 writing this program.
-    ibutton.reset();
-    ibutton.write(0xD5);
-    
-    for (byte x = 0; x<8; x++){
-      digitalWrite(RED, HIGH);
-      delay(5);
-      writeByte(code[x]);
-      digitalWrite(RED, LOW);
-      delay(15);
-    }
-                                  //TODO: Implement readback to make sure everything was written correctly...?
-    ibutton.reset();
-    delay(5);
-    ibutton.reset_search();       //If we don't reset, the next ibutton.search will fail.
-    blinkPin(GREEN, 5, 150);
-    while(!digitalRead(WRITE)) delay(1);
-
-    return true;                  //TRUE, as the writing should be successfully done at this point.
-  } else {
+  if(!slot_is_full(activeMemSlot)) {
     blinkPin(RED, 5, 150);
     while(!digitalRead(WRITE)) delay(1);
     return false;                 //FALSE, as the slot is empty
   }
+
+  if (!ibutton.search(addr)) {  //read attached ibutton and assign value to buffer "addr"
+    digitalWrite(RED, HIGH);
+    ibutton.reset_search();
+    delay(1);
+    digitalWrite(RED, LOW);
+    return false;               //Returns FALSE if no iButton could not be detected for any reason
+  }
+  
+  S.print(F("Writing to iButton at address: "));
+  for (byte x = 0; x < 8; x++) {  
+    byte curr_val = addr[x];
+    S.print("0x");
+    if (curr_val<0x10) {S.print("0");}
+    S.print(curr_val,HEX);
+    if (x < 8 - 1) S.print(", ");
+  }
+  S.println();
+  S.print(F("Writing data: "));
+
+  for (byte x = 0; x<8; x++){
+    byte curr_val = code[x];
+    S.print("0x");
+    if (curr_val<0x10) {S.print("0");}
+    S.print(curr_val,HEX);
+    if (x < 8 - 1) S.print(", ");
+    }
+    S.println();
+                  // S.println(F("<DEBUG> NOT PROCEEDING - RETURNING FROM FUNCTION IMMEDIATELY!"));
+                  // return;
+
+  //CRITICAL FIXME THIS MUST BE RUN BEFORE WRITING AS THE WRITE FUNCTION DEPENDS ON IT ENTIRELY!!!
+  //MAKE IT SO THE WRITE ENSURES THE SLOT ISN'T EMPTY, AND SYNCES THIS GLOBAL VARIABLE JUST BEFORE WRITING!
+  //IDEALLY, THE WRITE FUNCTION WOULD GET THE DATA FROM THE CURRENTLY ACTIVE EEPROM SLOT COMPLETELY INDEPENDENTLY!!!
+  //MAKE SURE THE CODE ABOUT TO BE WRITTEN DOES MAKE SENSE AND DOESN'T START WITH ZERO BYTE!!!
+
+  ibutton.skip();               // This is code preparing RW1990 to be written to...
+  ibutton.reset();              // THESE LINES ARE VITAL
+  ibutton.write(0x33);          // I thought they were just for reading, but without these lines,
+  ibutton.skip();               // writing will brick the fob forever! I broke 6 writing this program.
+  ibutton.reset();
+  ibutton.write(0xD5);
+  
+  for (byte x = 0; x<8; x++){
+    digitalWrite(RED, HIGH);
+    delay(5);
+    writeByte(code[x]);
+    digitalWrite(RED, LOW);
+    delay(15);
+  }
+                                //TODO: Implement readback to make sure everything was written correctly...?
+  ibutton.reset();
+  delay(5);
+  ibutton.reset_search();       //If we don't reset, the next ibutton.search will fail.
+  blinkPin(GREEN, 5, 150);
+  while(!digitalRead(WRITE)) delay(1);
+
+  return true;                  //TRUE, as the writing should be successfully done at this point.
+}
+
+bool verify_iButton() { //Verify iButton against currently active memory slot
+  update_slot();
+  //Is current memory slot blank?
+  if(!slot_is_full(activeMemSlot)) {S.println(F("[ERROR] Currently active memory slot is blank\n")); return false;}
+  //Is iButton present?
+  //Read iBtn address
+  if (!ibutton.search(addr)) {  //read attached ibutton and assign value to buffer "addr"
+    digitalWrite(RED, HIGH);
+    ibutton.reset_search();
+    delay(1);
+    digitalWrite(RED, LOW);
+    S.println(F("[ERROR] No iButton device was detected\n"));
+    return false;               //Returns FALSE if no iButton could not be detected for any reason
+  }
+  ibutton.reset_search();               //If we don't reset, the next ibutton.search will fail.
+
+  //Match against the one in the current memory slot
+  
+  S.print(F("[INFO] Reading code from device slot... "));
+  S.print(activeMemSlot, HEX); S.print(" : ");
+  print_mem_name(activeMemSlot); S.print(" : ");
+  if (advancedMode) {                 //If in advanced mode,
+    print_mem(0, 8, activeMemSlot);     //print all of the 8 bytes...
+  } else {                            //If not in advanced mode however...
+    print_mem(0, 7, activeMemSlot);     //Don't print the last byte (CRC, a calculated cyclical redundancy check)
+    // print_mem(1, 7, activeMemSlot);     //Don't print the first byte (0x0C, family code) and last byte (CRC, a calculated cyclical redundancy check)
+  }
+  S.println();
+
+  detect_iButton();
+
+  S.println();
+
+  bool mismatch = false;
+  for(int i = 0; i < 8; i++) {
+    if (EEPROM.read(i + (activeMemSlot << 5)) != addr[i]) {
+      mismatch = true;
+      S.print(F("Mismatch on index "));
+      S.print(i);
+      S.print(F(": "));
+      S.print(EEPROM.read(i + (activeMemSlot << 5)), HEX);
+      S.print(F("<->"));
+      S.println(addr[i], HEX);
+    }
+  }
+  S.println();
+    
+  if (mismatch) {
+    S.println(F("[ERROR] An iButton address does not correspond to one saved in a memory slot!\n"));
+    return false;
+  }
+
+  S.println(F("[SUCCESS] An iButton address matches the one saved in a currently active memory slot!\n"));
+  return true;
 }
 
 void function_caller() { //TODO: Merge this with the serial parser function?
@@ -930,6 +990,10 @@ void function_caller() { //TODO: Merge this with the serial parser function?
           }
         }
         S.println();
+        break;
+
+      case 10:
+        verify_iButton();
         break;
       
       default:
